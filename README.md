@@ -24,24 +24,17 @@ It is using the tf.keras api, as it has become the standard go-to from TF 2.0.
 ## Files
 
 Directory structure:
-
+```
 .
-
 ├── data
-
 └── model_training
-
     ├── tf_keras_model
-
     └── saved_model
-
         └── my_model
-
             └── 1
-
                 ├── assets
-
                 └── variables
+```
 
 Original files (detailed in `homework_dl.md`)
 
