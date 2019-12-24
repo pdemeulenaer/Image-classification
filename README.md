@@ -18,7 +18,7 @@ The strategy selected is a multi-task approach (here 2-tasks): one single model 
 
 The model makes use of a transfer-learning model. It is composed of a convolutional base (VGG16 net), and a dense output for each task. See the model.png file for details.
 
-It is using the tf.keras api, as it has become the standard go-to from TF 2.0
+It is using the tf.keras api, as it has become the standard go-to from TF 2.0.
 
 
 ## Files
@@ -71,43 +71,15 @@ Solution files:
 
 - directory `./model_training/saved_model`: the tf.keras model is converted to tensorflow .pb file format. This is used for the tensorflow-serving application.
 
+
 ## Note on software & hardware used
 
-The model was run on an Ubuntu 18.04 machine, using a GTX 1060 GPU.
+The model was run on an Ubuntu 18.04 machine, using a GTX 1060 GPU. One epoch lasts ~ 90sec. 
 
 The python environment with the version of the packages is detailed in the `conda_list.txt` file. 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# What could be added to this work
+## What could be added to this work
 
 - Unit testing
 
@@ -122,9 +94,5 @@ The python environment with the version of the packages is detailed in the `cond
 - Implement fine-tuning by unfreezing the last convolutional block of the VGG16
 
 - Try different architectures (tried a few ones, but many more to explore)
-
-
-
-
 
 
