@@ -13,12 +13,33 @@ import json
 import matplotlib.pyplot as plt
 
 import tensorflow as tf
-from tensorflow.keras.layers import Dense, Flatten, Dropout, Conv2D, MaxPool2D, Activation, MaxPooling2D, BatchNormalization, Input
+from tensorflow.keras.layers import Dense, Flatten, Dropout, Conv2D, MaxPool2D, Activation, MaxPooling2D, Input, GlobalAveragePooling2D
 from tensorflow.keras import models
 from tensorflow.keras.models import Sequential, load_model, Model
 from tensorflow.keras.preprocessing.image import ImageDataGenerator, img_to_array, load_img
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, TerminateOnNaN, ReduceLROnPlateau, CSVLogger
 from tensorflow.keras.utils import plot_model, to_categorical
+
+#from tensorflow.keras import backend as K
+#from tensorflow.keras import layers as kl
+
+#from tensorflow.keras import applications, layers
+
+#class BatchNormalization(kl.BatchNormalization):
+#    def call(self, inputs, training=None):
+#        true_phase = int(K.get_session().run(K.learning_phase()))
+#        trainable = int(self.trainable)
+#        with K.learning_phase_scope(trainable * true_phase):
+#            ret = super(BatchNormalization, self).call(inputs, training)
+#        return ret   
+    
+
+#class FrozenBatchNormalization(layers.BatchNormalization):
+#    def call(self, inputs, training=None):
+#        return super().call(inputs=inputs, training=False)
+
+
+
 
 
 def Get_and_Plot_correlations(df,size=10, min_cor=0.0):
@@ -94,7 +115,7 @@ def downsample(df, label_col_name, random_state=42):
     return df_out
 
 
-def transfer_learning_model(height,width):
+def transfer_learning_model(height,width,fine_tuning=False):
     '''
     This function defines the multi-task transfer learning model: 
     * The task 1 is a multi-class classification of the cc3 classes. The output for this task 
@@ -119,27 +140,95 @@ def transfer_learning_model(height,width):
     
     # On available models: https://keras.io/applications/#available-models
     # On transfer learning: https://towardsdatascience.com/keras-transfer-learning-for-beginners-6c9b8b7143e
-    
-    from tensorflow.keras.applications import VGG16
-    conv_base = VGG16(weights='imagenet',
-    #from tensorflow.keras.applications import VGG19
-    #conv_base = VGG19(weights='imagenet',                  
+ 
+    #from tensorflow.keras.applications import VGG16
+    #conv_base = VGG16(weights='imagenet',
+    #                  include_top=False,
+    #                  input_shape=(height,width,3))                      
+    from tensorflow.keras.applications import VGG19
+    conv_base = VGG19(weights='imagenet',                  
                       include_top=False,
                       input_shape=(height,width,3))
-    conv_base.trainable = False
-
+    
+    if not fine_tuning:
+        conv_base.trainable = False
+    
+    if fine_tuning:    
+        # CASE fine-tuning
+        conv_base.trainable = True
+        set_trainable = False
+        for layer in conv_base.layers:
+            if layer.name in ['block5_conv1']: #, 'block4_conv1'
+                set_trainable = True
+            if set_trainable:
+                layer.trainable = True
+            else:
+                layer.trainable = False   
+            print(layer.name, layer.trainable)
+            
+        layers = [(layer, layer.name, layer.trainable) for layer in conv_base.layers]
+        print(pd.DataFrame(layers, columns=['Layer Type', 'Layer Name', 'Layer Trainable']).head(300))
+        #print(conv_base.trainable_weights)
+    '''
     #from tensorflow.keras.applications.xception import Xception
     #conv_base = Xception(weights='imagenet',
     #                  include_top=False,
-    #                  input_shape=(height,width,3))
-    #conv_base.trainable = False
-
-    #from tensorflow.keras.applications.resnet import ResNet50
-    #conv_base = ResNet50(weights='imagenet',
-    #                  include_top=False,
+    #                  layers=tf.keras.layers,       
     #                  input_shape=(height,width,3))
     #conv_base.trainable = False
     
+    #from keras.applications.inception_v3 import InceptionV3
+    #conv_base = InceptionV3(weights='imagenet',
+    #                  include_top=False,
+    #                  layers=tf.keras.layers,    
+    #                  input_shape=(height,width,3))  
+     
+    
+    # Keep a copy of the original class
+    #from tensorflow.keras import applications, layers    
+    #BatchNormalization = layers.BatchNormalization
+    # Patch the class temporarily
+    #layers.BatchNormalization = FrozenBatchNormalization
+ 
+
+    # Build the model with our patched version of layers              
+    from tensorflow.keras.applications.resnet import ResNet50
+    conv_base = ResNet50(weights='imagenet',
+                      include_top=False,
+                      layers=tf.keras.layers,
+                      input_shape=(height,width,3))
+    
+    # Undo the patch
+    #layers.BatchNormalization = BatchNormalization     
+    
+    #from tensorflow.keras.applications import MobileNetV2    
+    #conv_base = MobileNetV2(weights='imagenet',
+    #                  include_top=False,
+    #                  layers=tf.keras.layers,                         
+    #                  input_shape=(height,width,3))
+
+
+    conv_base.trainable = False
+    # CASE fine-tuning only BatchNormalization layers
+    #conv_base.trainable = True
+    #set_trainable = False
+    #for layer in conv_base.layers:
+    #    set_trainable = False
+    #    if layer.name.endswith('bn') or layer.name.endswith('BN'):
+    #        set_trainable = True
+    #    if set_trainable:
+    #        layer.trainable = True
+    #    else:
+    #        layer.trainable = False   
+    #    #print(layer.name, layer.trainable) 
+        
+    #for layer in conv_base.layers[-5:]:
+    #    layer.trainable =  True        
+                            
+    layers = [(layer, layer.name, layer.trainable) for layer in conv_base.layers]
+    print(pd.DataFrame(layers, columns=['Layer Type', 'Layer Name', 'Layer Trainable']).head(1000))
+    #print(conv_base.trainable_weights)            
+    '''       
 
     # =======================
     # Definition of the model
@@ -149,7 +238,7 @@ def transfer_learning_model(height,width):
     # https://keras.io/getting-started/functional-api-guide/#multi-input-and-multi-output-models
     # https://medium.com/@vijayabhaskar96/multi-label-image-classification-tutorial-with-keras-imagedatagenerator-cd541f8eaf24
     
-    inp = Input(shape = (height,width,3), name='input')
+    inp = Input(shape = (height,width,3), name='input', dtype=tf.float32)
     x = conv_base(inp)
     #x = GlobalMaxPooling2D()(x)
     #x = GlobalAveragePooling2D()(x)
@@ -158,24 +247,40 @@ def transfer_learning_model(height,width):
     #option1
     #x = Dense(512, activation='relu')(x)
     #x = Dropout(0.25)(x)
-    #x = Dense(64, activation='relu')(x)
-    x = Dropout(0.25)(x)
-    output1 = Dense(5, activation = 'softmax', name='cc3')(x)
-    output2 = Dense(3, activation = 'sigmoid', name='tags')(x)
+    #x = Dense(512, activation='relu')(x)
+    #x = Dropout(0.25)(x)
+
+    x = Dropout(0.25)(x)    
+    
+    # Important to bring type of last layer to float32: https://github.com/tensorflow/tensorflow/issues/34406
+    output1 = Dense(5, activation = 'softmax', name='cc3', dtype=tf.float32)(x)
+    output2 = Dense(3, activation = 'sigmoid', name='tags', dtype=tf.float32)(x)
 
     #option2
     #branch1
     #x1 = Dense(512, activation='relu')(x)
     #x1 = Dropout(0.5)(x1)
-    #x1 = Dense(64, activation='relu')(x1)
+    #x1 = Dense(512, activation='relu')(x1)
     #x1 = Dropout(0.5)(x1)
-    #output1 = Dense(5, activation = 'softmax', name='cc3')(x1)
+    #output1 = Dense(5, activation = 'softmax', name='cc3', dtype=tf.float32)(x1)
     #branch2
     #x2 = Dense(512, activation='relu')(x)
     #x2 = Dropout(0.5)(x2)
-    #x2 = Dense(64, activation='relu')(x2)
+    #x2 = Dense(512, activation='relu')(x2)
     #x2 = Dropout(0.5)(x2)
-    #output2 = Dense(3, activation = 'sigmoid', name='tags')(x2)
+    #output2 = Dense(3, activation = 'sigmoid', name='tags', dtype=tf.float32)(x2)
+  
+    #common branch
+    #x = Dense(512, activation='relu')(x)
+    #x = Dropout(0.25)(x)
+    #branch1    
+    #x1 = Dense(512, activation='relu')(x)
+    #x1 = Dropout(0.25)(x1)
+    #output1 = Dense(5, activation = 'softmax', name='cc3', dtype=tf.float32)(x1)
+    #branch2
+    #x2 = Dense(512, activation='relu')(x)
+    #x2 = Dropout(0.25)(x2)
+    #output2 = Dense(3, activation = 'sigmoid', name='tags', dtype=tf.float32)(x2)    
 
     model = Model(inp,[output1,output2])        
     return model
